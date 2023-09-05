@@ -1,3 +1,4 @@
 Pipfile.lock
 .env.ee
+.env
 hs_err_pid23594.log
