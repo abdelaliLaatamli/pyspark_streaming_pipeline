@@ -46,21 +46,24 @@ class LogsPipelinePySpark(BaseFlow):
         - bounce_read_stream
         - delivered_read_stream
         """
-        self.spark = SparkSession \
-            .builder \
-            .master("spark://128.140.13.110:7077") \
-            .appName("pmta_log_pipline") \
-            .config("spark.executor.memory", "10g") \
-            .config('spark.executor.cores', '10') \
-            .config('spark.cores.max', '10') \
-            .config("spark.sql.adaptive.enabled", "false") \
-            .config("spark.hadoop.fs.s3a.access.key", os.environ.get("AWS_ACCESS_KEY") or "AWS_ACCESS_KEY") \
-            .config("spark.hadoop.fs.s3a.secret.key", os.environ.get("AWS_SECRET_KEY") or "AWS_SECRET_KEY") \
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-            .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.TemporaryAWSCredentialsProvider" )\
-            .config('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider')\
-            .getOrCreate()
-        
+        try:
+            self.spark = SparkSession \
+                .builder \
+                .master(f"spark://{os.environ.get('MASTER_SPARK') or 'MASTER_SPARK'}:7077") \
+                .appName("pmta_log_pipline") \
+                .config("spark.executor.memory", "10g") \
+                .config('spark.executor.cores', '10') \
+                .config('spark.cores.max', '10') \
+                .config("spark.sql.adaptive.enabled", "false") \
+                .config("spark.hadoop.fs.s3a.access.key", os.environ.get("AWS_ACCESS_KEY") or "AWS_ACCESS_KEY") \
+                .config("spark.hadoop.fs.s3a.secret.key", os.environ.get("AWS_SECRET_KEY") or "AWS_SECRET_KEY") \
+                .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+                .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.TemporaryAWSCredentialsProvider" )\
+                .config('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider')\
+                .getOrCreate()
+        except Exception as e:
+            raise Exception(f"Exception was raised {e} ")
+            
     @step(next=['bounce_transformation'])
     def bounce_read_stream(self):
         """
