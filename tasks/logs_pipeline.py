@@ -32,7 +32,7 @@ except Exception as e:
 
 class LogsPipelinePySpark(BaseFlow):
 
-    fail_on_data_loss = "false"
+    fail_on_data_loss = "true"
 
     @start
     @step(next=["bounce_transformation", "delivered_transformation"])
