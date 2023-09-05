@@ -35,9 +35,17 @@ class LogsPipelinePySpark(BaseFlow):
     fail_on_data_loss = "true"
 
     @start
-    @step(next=["bounce_transformation", "delivered_transformation"])
+    @step(next=["bounce_read_stream", "delivered_read_stream"])
     def start_spark_session(self):
-        print()
+        """
+        This step is init spark session with and start application.
+        connect with master node with name 'pmta_log_pipline' , reserve necessary resources  ,
+        enable using sql in streaming and
+        connect with S3 and configure S3 as a Storage
+        after Connecting to Master we pass to next steps 
+        - bounce_read_stream
+        - delivered_read_stream
+        """
         self.spark = SparkSession \
             .builder \
             .master("spark://128.140.13.110:7077") \
@@ -53,18 +61,14 @@ class LogsPipelinePySpark(BaseFlow):
             .config('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider')\
             .getOrCreate()
         
-    def funs(self , _ ):
-        return F.when(F.col("bounceCat").isin("bad-mailbox", "inactive-mailbox"), "hard") \
-            .when(F.col("bounceCat").isin("policy-related", "quota-issues"), "soft") \
-            .otherwise("other")
-
-    @step(next=["union_delivered_bounce"])
-    def bounce_transformation(self):
+    @step(next=['bounce_transformation'])
+    def bounce_read_stream(self):
         """
-        Here we add a snapshot_date to the input dataframe of 2023-03-12
+        Here we listen to kafka streaming topic
+        after listening to topic we pass to next step
+        - bounce_transformation
         """
-        print("------" , self.spark.getActiveSession())
-        data_bounce = self.spark \
+        self.data_bounce = self.spark \
             .readStream \
             .format("kafka") \
             .option("kafka.bootstrap.servers", f'{os.environ.get("KAFKA_HOST") or "KAFKA_HOST"}:{os.environ.get("KAFKA_PORT") or "KAFKA_PORT"}') \
@@ -72,8 +76,15 @@ class LogsPipelinePySpark(BaseFlow):
             .option("startingOffsets", "earliest") \
             .option("failOnDataLoss", self.fail_on_data_loss ) \
             .load()
-        
-        self.data_bounce = data_bounce.withColumn("value", split("value", ",")) .selectExpr(
+
+    @step(next=["union_delivered_bounce"])
+    def bounce_transformation(self):
+        """     
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_delivered_bounce
+        """
+        self.data_bounce = self.data_bounce.withColumn("value", split("value", ",")).selectExpr(
             "value[0] as server_name",
             "cast(value[1] as Date) as date",
             "value[3] as rcpt",
@@ -90,14 +101,15 @@ class LogsPipelinePySpark(BaseFlow):
             col("server_name") , col("date"),  col("email_domain") , 
             col("job_id"),  col("user"), col("domain") , col("ip") , lit('bounce').alias("type") , col("bounce_type") 
         ).filter("is_seed == 0")
-        
 
-    @step(next=["union_delivered_bounce"])
-    def delivered_transformation(self):
+    @step(next=["delivered_transformation"])
+    def delivered_read_stream(self):
         """
-        Here we add a snapshot_date to the input dataframe of 2023-03-12
+        Here we listen to kafka streaming topic
+        after listening to topic we pass to next step
+        - delivered_transformation
         """
-        data_delivered = self.spark \
+        self.data_delivered = self.spark \
             .readStream \
             .format("kafka") \
             .option("kafka.bootstrap.servers", f'{os.environ.get("KAFKA_HOST") or "KAFKA_HOST"}:{os.environ.get("KAFKA_PORT") or "KAFKA_PORT"}') \
@@ -105,8 +117,16 @@ class LogsPipelinePySpark(BaseFlow):
             .option("startingOffsets", "earliest") \
             .option("failOnDataLoss", self.fail_on_data_loss ) \
             .load()
-        
-        self.data_delivered = data_delivered.withColumn("value", split("value", ",")).selectExpr(
+
+
+    @step(next=["union_delivered_bounce"])
+    def delivered_transformation(self):
+        """  
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_delivered_bounce
+        """
+        self.data_delivered = self.data_delivered.withColumn("value", split("value", ",")).selectExpr(
             "value[0] as server_name",
             "cast(value[1] as Date) as date",
             "value[3] as rcpt",
@@ -127,17 +147,22 @@ class LogsPipelinePySpark(BaseFlow):
     @step(next=["write_data"])
     def union_delivered_bounce(self):
         """
-        Here we append the two dataframe together
+        Here we merge the two streames together , then applay group by count aggregations 
+        after merging and aggregate data we pass to next step
+        - write_data
         """
         combined_dstream = self.data_bounce.union(self.data_delivered)
         self.combined_dstream_aggregation = combined_dstream \
             .groupBy(*combined_dstream.columns) \
             .agg( count("*").alias("total_count") )
         
-    @step(next=["show_data"]) 
+    @step(next=["wait_for_listners"]) 
     def write_data(self):
         """
-        Here we append the two dataframe together
+        Here we store the 2 types , the new final streaming dataframe of aggregated data in database.
+        and store row data in S3 storage as cvs file.
+        after storing data we pass to next step
+        - wait_for_listners
         """
         self.data_bounce.writeStream \
             .outputMode("append") \
@@ -165,14 +190,14 @@ class LogsPipelinePySpark(BaseFlow):
 
     @end
     @step
-    def show_data(self):
+    def wait_for_listners(self):
         """
-        Here we show the new final dataframe of aggregated data. However in real use cases. It would
-        be more likely to write the data to some final layer/format
+        Here we wait for Termination of listenrs. 
+        and stop application if still running
         """
         self.query.awaitTermination()
-        print("------" , self.spark.getActiveSession())
-        self.spark.stop()
+        if self.spark.getActiveSession() :
+            self.spark.stop()
 
 
     #Process and write the streaming DataFrame to MySQL using foreachBatch
@@ -194,7 +219,6 @@ class LogsPipelinePySpark(BaseFlow):
             values_string = " , ".join( [ '%s' for _ in values ] )
             sql = f"INSERT INTO logs_table ( { colums } ) VALUES ( {values_string} ) ON DUPLICATE KEY UPDATE total_count = %s"
             # add on duplicate value
-            #print(sql)
             values.append(values[ len(values) - 1 ])
             try :
                 cursor.execute(sql, values)
@@ -204,3 +228,8 @@ class LogsPipelinePySpark(BaseFlow):
                 print(f" error on {sql} , {values_string} ")
         cursor.close()
         connection.close()
+
+    def funs(self , _ ):
+        return F.when(F.col("bounceCat").isin("bad-mailbox", "inactive-mailbox"), "hard") \
+            .when(F.col("bounceCat").isin("policy-related", "quota-issues"), "soft") \
+            .otherwise("other")

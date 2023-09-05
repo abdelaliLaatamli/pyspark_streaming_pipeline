@@ -1,0 +1,109 @@
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"/>
+<meta name="description" content="Diagram showing the FlowChart for LogsPipelinePySpark"/>
+<style>
+  /* This keeps the DAG centered */
+  .mermaid {
+    text-align: center;
+    margin-top: 10%;
+    margin-bottom: 10%;
+}
+</style>
+</head>
+<title>LogsPipelinePySpark</title>
+<body>
+<!-- We use pre so that these parts are loaded first -->
+<pre class="mermaid">
+graph TD;
+subgraph step-start_spark_session
+start_spark_session(start_spark_session) ~~~ start_spark_session_description[["""
+        This step is init spark session with and start application.
+        connect with master node with name 'pmta_log_pipline' , reserve necessary resources  ,
+        enable using sql in streaming and
+        connect with S3 and configure S3 as a Storage
+        after Connecting to Master we pass to next steps 
+        - bounce_read_stream
+        - delivered_read_stream
+        """]];
+end;
+step-start_spark_session ==> step-bounce_read_stream;
+step-start_spark_session ==> step-delivered_read_stream;
+subgraph step-bounce_read_stream
+bounce_read_stream(bounce_read_stream) ~~~ bounce_read_stream_description[["""
+        Here we listen to kafka streaming topic
+        after listening to topic we pass to next step
+        - bounce_transformation
+        """]];
+end;
+step-bounce_read_stream ==> step-bounce_transformation;
+subgraph step-delivered_read_stream
+delivered_read_stream(delivered_read_stream) ~~~ delivered_read_stream_description[["""
+        Here we listen to kafka streaming topic
+        after listening to topic we pass to next step
+        - delivered_transformation
+        """]];
+end;
+step-delivered_read_stream ==> step-delivered_transformation;
+subgraph step-delivered_transformation
+delivered_transformation(delivered_transformation) ~~~ delivered_transformation_description[["""  
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_delivered_bounce
+        """]];
+end;
+step-delivered_transformation ==> step-union_delivered_bounce;
+subgraph step-bounce_transformation
+bounce_transformation(bounce_transformation) ~~~ bounce_transformation_description[["""     
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_delivered_bounce
+        """]];
+end;
+step-bounce_transformation ==> step-union_delivered_bounce;
+subgraph step-union_delivered_bounce
+union_delivered_bounce(union_delivered_bounce) ~~~ union_delivered_bounce_description[["""
+        Here we merge the two streames together , then applay group by count aggregations 
+        after merging and aggregate data we pass to next step
+        - write_data
+        """]];
+end;
+step-union_delivered_bounce ==> step-write_data;
+subgraph step-write_data
+write_data(write_data) ~~~ write_data_description[["""
+        Here we store the 2 types , the new final streaming dataframe of aggregated data in database.
+        and store row data in S3 storage as cvs file.
+        after storing data we pass to next step
+        - wait_for_listners
+        """]];
+end;
+step-write_data ==> step-wait_for_listners;
+subgraph step-wait_for_listners
+wait_for_listners(wait_for_listners) ~~~ wait_for_listners_description[["""
+        Here we wait for Termination of listenrs. 
+        and stop application if still running
+        """]];
+end;
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  // We use the mermaid API to change the theme page wide
+  mermaid.initialize({
+  theme: 'base',
+  themeVariables: {
+      'primaryColor': '#5A5A5A',
+      'primaryTextColor': 'white',
+      'primaryBorderColor': '#5A5A5A',
+      'lineColor': '#F8B229',
+      'secondaryColor': '#006100',
+      'tertiaryColor': '#D3D3D3',
+      'tertiaryTextColor': 'black',
+    }
+  })
+</script>
+  </body>
+</html>
+</body>
+</html>
