@@ -1,5 +1,5 @@
 try:
-    import os , sys , pymysql , findspark
+    import os , sys , pymysql , findspark , logging
     from flowrunner import BaseFlow, end, start, step
 
     spark_version = '3.3.2'
@@ -31,7 +31,7 @@ except Exception as e:
 
 
 class LogsPipelinePySpark(BaseFlow):
-
+    spark = None
     fail_on_data_loss = "true"
 
     @start
@@ -62,7 +62,10 @@ class LogsPipelinePySpark(BaseFlow):
                 .config('spark.hadoop.fs.s3a.aws.credentials.provider', 'org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider')\
                 .getOrCreate()
         except Exception as e:
-            raise Exception(f"Exception was raised {e} ")
+            logging.error("exceptions")
+            raise Exception(f"Exception was raised on Step 1 : {e} ")
+        
+        return self
             
     @step(next=['bounce_transformation'])
     def bounce_read_stream(self):
@@ -104,6 +107,8 @@ class LogsPipelinePySpark(BaseFlow):
             col("server_name") , col("date"),  col("email_domain") , 
             col("job_id"),  col("user"), col("domain") , col("ip") , lit('bounce').alias("type") , col("bounce_type") 
         ).filter("is_seed == 0")
+
+        return self.data_bounce
 
     @step(next=["delivered_transformation"])
     def delivered_read_stream(self):

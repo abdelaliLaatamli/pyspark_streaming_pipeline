@@ -1,0 +1,99 @@
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"/>
+<meta name="description" content="Diagram showing the FlowChart for UserAgentPySpark"/>
+<style>
+  /* This keeps the DAG centered */
+  .mermaid {
+    text-align: center;
+    margin-top: 10%;
+    margin-bottom: 10%;
+}
+</style>
+</head>
+<title>UserAgentPySpark</title>
+<body>
+<!-- We use pre so that these parts are loaded first -->
+<pre class="mermaid">
+graph TD;
+subgraph step-start_spark_session
+start_spark_session(start_spark_session) ~~~ start_spark_session_description[["""
+        This step is init spark session with and start application.
+        connect with master node with name 'user_agent_pipline' , reserve necessary resources and
+        enable using sql in streaming 
+        after Connecting to Master we pass to next steps 
+        - actions_read_stream
+        - esp_domains_read_as_stream
+        """]];
+end;
+step-start_spark_session ==> step-actions_read_stream;
+step-start_spark_session ==> step-esp_domains_read_as_stream;
+subgraph step-esp_domains_read_as_stream
+esp_domains_read_as_stream(esp_domains_read_as_stream) ~~~ esp_domains_read_as_stream_description[["""
+        Here we static dataframe from mysql
+        after loading esp list we pass to next step
+        - join_actions_with_esp_domains_stream
+        """]];
+end;
+step-esp_domains_read_as_stream ==> step-join_actions_with_esp_domains_stream;
+subgraph step-actions_read_stream
+actions_read_stream(actions_read_stream) ~~~ actions_read_stream_description[["""
+        Here we listen to kafka streaming topic then 
+        we transform data and generate new columns with details
+        after listening to topic we pass to next step
+        - join_actions_with_esp_domains_stream
+        """]];
+end;
+step-actions_read_stream ==> step-join_actions_with_esp_domains_stream;
+subgraph step-join_actions_with_esp_domains_stream
+join_actions_with_esp_domains_stream(join_actions_with_esp_domains_stream) ~~~ join_actions_with_esp_domains_stream_description[["""
+        Here we left join dynamic stream with static stream 
+        after joining data we pass to next step
+        - aggregate_stream
+        """]];
+end;
+step-join_actions_with_esp_domains_stream ==> step-aggregate_stream;
+subgraph step-aggregate_stream
+aggregate_stream(aggregate_stream) ~~~ aggregate_stream_description[["""
+        Here we store result in our database mysql 
+        after storing data we pass to next step
+        - write_stream
+        """]];
+end;
+step-aggregate_stream ==> step-write_stream;
+subgraph step-write_stream
+write_stream(write_stream) ~~~ write_stream_description[["""
+        Here we wait for Termination of listenrs. 
+        and stop application if still running
+        """]];
+end;
+step-write_stream ==> step-wait_for_listners;
+subgraph step-wait_for_listners
+wait_for_listners(wait_for_listners) ~~~ wait_for_listners_description[["""
+        Here we wait for Termination of listenrs. 
+        and stop application if still running
+        """]];
+end;
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  // We use the mermaid API to change the theme page wide
+  mermaid.initialize({
+  theme: 'base',
+  themeVariables: {
+      'primaryColor': '#5A5A5A',
+      'primaryTextColor': 'white',
+      'primaryBorderColor': '#5A5A5A',
+      'lineColor': '#F8B229',
+      'secondaryColor': '#006100',
+      'tertiaryColor': '#D3D3D3',
+      'tertiaryTextColor': 'black',
+    }
+  })
+</script>
+  </body>
+</html>
+</body>
+</html>
