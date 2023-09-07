@@ -8,6 +8,8 @@ pyspark = "*"
 findspark = "*"
 pymysql = "*"
 flowrunner = "*"
+geoip2 = "*"
+user-agents = "*"
 
 [dev-packages]
 

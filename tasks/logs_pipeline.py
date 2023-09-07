@@ -50,7 +50,7 @@ class LogsPipelinePySpark(BaseFlow):
             self.spark = SparkSession \
                 .builder \
                 .master(f"spark://{os.environ.get('MASTER_SPARK') or 'MASTER_SPARK'}:7077") \
-                .appName("pmta_log_pipline") \
+                .appName("pmta_log_pipeline") \
                 .config("spark.executor.memory", "10g") \
                 .config('spark.executor.cores', '10') \
                 .config('spark.cores.max', '10') \

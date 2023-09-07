@@ -1,0 +1,159 @@
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"/>
+<meta name="description" content="Diagram showing the FlowChart for ActionsPipelinePySpark"/>
+<style>
+  /* This keeps the DAG centered */
+  .mermaid {
+    text-align: center;
+    margin-top: 10%;
+    margin-bottom: 10%;
+}
+</style>
+</head>
+<title>ActionsPipelinePySpark</title>
+<body>
+<!-- We use pre so that these parts are loaded first -->
+<pre class="mermaid">
+graph TD;
+subgraph step-start_spark_session
+start_spark_session(start_spark_session) ~~~ start_spark_session_description[["""
+        This step is init spark session with and start application.
+        connect with master node with name 'actions_pipeline' , reserve necessary resources and
+        enable using sql in streaming 
+        after Connecting to Master we pass to next steps 
+        - open_read_stream
+        - click_read_stream
+        - unsub_read_stream
+        """]];
+end;
+step-start_spark_session ==> step-open_read_stream;
+step-start_spark_session ==> step-click_read_stream;
+step-start_spark_session ==> step-unsub_read_stream;
+subgraph step-open_read_stream
+open_read_stream(open_read_stream) ~~~ open_read_stream_description[["""
+        Here we listen to kafka streaming topic 'open_actions'
+        after listening to topic we pass to next step
+        - transform_open_stream
+        """]];
+end;
+step-open_read_stream ==> step-transform_open_stream;
+subgraph step-click_read_stream
+click_read_stream(click_read_stream) ~~~ click_read_stream_description[["""
+        Here we listen to kafka streaming topic 'click_actions'
+        after listening to topic we pass to next step
+        - transform_click_stream
+        """]];
+end;
+step-click_read_stream ==> step-transform_click_stream;
+subgraph step-unsub_read_stream
+unsub_read_stream(unsub_read_stream) ~~~ unsub_read_stream_description[["""
+        Here we listen to kafka streaming topic 'unsub_actions'
+        after listening to topic we pass to next step
+        - transform_unsub_stream
+        """]];
+end;
+step-unsub_read_stream ==> step-transform_unsub_stream;
+subgraph step-transform_click_stream
+transform_click_stream(transform_click_stream) ~~~ transform_click_stream_description[["""     
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_actions_stream
+        """]];
+end;
+step-transform_click_stream ==> step-union_actions_stream;
+subgraph step-transform_open_stream
+transform_open_stream(transform_open_stream) ~~~ transform_open_stream_description[["""     
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_actions_stream
+        """]];
+end;
+step-transform_open_stream ==> step-union_actions_stream;
+subgraph step-transform_unsub_stream
+transform_unsub_stream(transform_unsub_stream) ~~~ transform_unsub_stream_description[["""     
+        Here we transform data and extract necessary data 
+        after trasform data we pass to next step
+        - union_actions_stream
+        """]];
+end;
+step-transform_unsub_stream ==> step-union_actions_stream;
+subgraph step-union_actions_stream
+union_actions_stream(union_actions_stream) ~~~ union_actions_stream_description[["""
+        Here we merge the three streames together
+        after merging data we pass to next step
+        - esp_domains_read_as_stream
+        - read_list_names_as_stream
+        """]];
+end;
+step-union_actions_stream ==> step-esp_domains_read_as_stream;
+step-union_actions_stream ==> step-read_list_names_as_stream;
+subgraph step-read_list_names_as_stream
+read_list_names_as_stream(read_list_names_as_stream) ~~~ read_list_names_as_stream_description[["""
+        Here we read static dataframe from database as stream
+        after reading from database we pass to next step
+        - join_actions_with_esp_and_list_stream
+        """]];
+end;
+step-read_list_names_as_stream ==> step-join_actions_with_esp_and_list_stream;
+subgraph step-esp_domains_read_as_stream
+esp_domains_read_as_stream(esp_domains_read_as_stream) ~~~ esp_domains_read_as_stream_description[["""
+        Here we read static dataframe from database as stream
+        after reading from database we pass to next step
+        - join_actions_with_esp_and_list_stream
+        """]];
+end;
+step-esp_domains_read_as_stream ==> step-join_actions_with_esp_and_list_stream;
+subgraph step-join_actions_with_esp_and_list_stream
+join_actions_with_esp_and_list_stream(join_actions_with_esp_and_list_stream) ~~~ join_actions_with_esp_and_list_stream_description[["""
+        Here we left join dynamic stream with two static streams 
+        after joining data we pass to next step
+        - aggregate_joined_stream
+        """]];
+end;
+step-join_actions_with_esp_and_list_stream ==> step-aggregate_joined_stream;
+subgraph step-aggregate_joined_stream
+aggregate_joined_stream(aggregate_joined_stream) ~~~ aggregate_joined_stream_description[["""
+        Here we aggregate data count group by operation
+        after aggregating data we pass to next step
+        - write_stream
+        """]];
+end;
+step-aggregate_joined_stream ==> step-write_stream;
+subgraph step-write_stream
+write_stream(write_stream) ~~~ write_stream_description[["""
+        Here we store the result of pipeline. 
+        after storing data we pass to next step
+        - wait_for_listners
+        """]];
+end;
+step-write_stream ==> step-wait_for_listners;
+subgraph step-wait_for_listners
+wait_for_listners(wait_for_listners) ~~~ wait_for_listners_description[["""
+        Here we wait for Termination of listenrs. 
+        and stop application if still running
+        """]];
+end;
+
+</pre>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  // We use the mermaid API to change the theme page wide
+  mermaid.initialize({
+  theme: 'base',
+  themeVariables: {
+      'primaryColor': '#5A5A5A',
+      'primaryTextColor': 'white',
+      'primaryBorderColor': '#5A5A5A',
+      'lineColor': '#F8B229',
+      'secondaryColor': '#006100',
+      'tertiaryColor': '#D3D3D3',
+      'tertiaryTextColor': 'black',
+    }
+  })
+</script>
+  </body>
+</html>
+</body>
+</html>

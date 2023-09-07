@@ -21,8 +21,7 @@ try:
     findspark.init( '/opt/spark' )
     
     from pyspark.sql import SparkSession
-    from pyspark.sql.functions import col, split , lit , count , udf
-    from pyspark.sql import functions as F
+    from pyspark.sql.functions import col, split , count , udf
     from pyspark.sql.types import StructField , StructType , StringType , IntegerType
     
 
@@ -33,7 +32,7 @@ except Exception as e:
 
 
 
-class UserAgentPySpark(BaseFlow):
+class UserAgentPipelinePySpark(BaseFlow):
     spark = None
     fail_on_data_loss = "true"
 
@@ -53,7 +52,7 @@ class UserAgentPySpark(BaseFlow):
             self.spark = SparkSession \
                 .builder \
                 .master(f"spark://{os.environ.get('MASTER_SPARK') or 'MASTER_SPARK'}:7077") \
-                .appName("user_agent_pipline") \
+                .appName("user_agent_pipeline") \
                 .config("spark.executor.memory", "10g") \
                 .config('spark.executor.cores', '10') \
                 .config('spark.cores.max', '10') \
@@ -143,8 +142,8 @@ class UserAgentPySpark(BaseFlow):
     @step(next=["write_stream"])
     def aggregate_stream(self):
         """
-        Here we store result in our database mysql 
-        after storing data we pass to next step
+        Here we aggregate data count group by operation
+        after aggregat data we pass to next step
         - write_stream
         """
         self.joined_stream_aggregation = self.joined_combined_dstream \
@@ -155,8 +154,9 @@ class UserAgentPySpark(BaseFlow):
     @step(next=["wait_for_listners"])
     def write_stream(self):
         """
-        Here we wait for Termination of listenrs. 
-        and stop application if still running
+        Here we store the result of pipeline. 
+        after storing data we pass to next step
+        - write_stream
         """
         # self.query = self.joined_stream_aggregation \
         #     .writeStream \
