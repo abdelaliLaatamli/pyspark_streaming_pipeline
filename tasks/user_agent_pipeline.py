@@ -49,7 +49,7 @@ class UserAgentPipelinePySpark(BaseFlow):
         - esp_domains_read_as_stream
         """
         try:
-            self.spark = SparkSession \
+            self.spark = pyspark.sql.SparkSession \
                 .builder \
                 .master(f"spark://{os.environ.get('MASTER_SPARK') or 'MASTER_SPARK'}:7077") \
                 .appName("user_agent_pipeline") \
